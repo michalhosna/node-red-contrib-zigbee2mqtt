@@ -68,6 +68,10 @@ module.exports = function(RED) {
             node.on('close', () => this.onClose());
             node.setMaxListeners(0);
 
+            if (node.config.mqtt_username || node.config.mqtt_password) {
+                node.logger.warning('MQTT login is stored in plain text in the flow file. Open the editor and deploy to move it to the credentials file.');
+            }
+
             //mqtt
             node.mqtt = node.connectMQTT();
             node.mqtt.on('connect', () => this.onMQTTConnect());
@@ -87,8 +91,10 @@ module.exports = function(RED) {
             var node = this;
             var options = {
                 port: node.config.mqtt_port || 1883,
-                username: node.config.mqtt_username || null,
-                password: node.config.mqtt_password || null,
+                // Prefer the old properties, matching the editor migration (server.html).
+                // After a downgrade they can hold a newer login than the credentials.
+                username: node.config.mqtt_username || node.credentials.user || null,
+                password: node.config.mqtt_password || node.credentials.password || null,
                 clientId: 'NodeRed-' + node.id + '-' + (clientId ? clientId : (Math.random() + 1).toString(36).substring(7)),
             };
 
@@ -1042,5 +1048,10 @@ module.exports = function(RED) {
         }
     }
 
-    RED.nodes.registerType('zigbee2mqtt-server', ServerNode, {});
+    RED.nodes.registerType('zigbee2mqtt-server', ServerNode, {
+        credentials: {
+            user: {type: 'text'},
+            password: {type: 'password'}
+        }
+    });
 };

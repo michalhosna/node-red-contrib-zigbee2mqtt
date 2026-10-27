@@ -28,9 +28,10 @@ function addButton(server) {
 test('MQTT connection uses configured authentication and subscribes on connect', () => {
     const { node, client, connection } = createServer({
         mqtt_port: 1884,
-        mqtt_username: 'user',
-        mqtt_password: 'pass',
         mqtt_qos: '1'
+    }, {
+        user: 'user',
+        password: 'pass'
     });
 
     assert.equal(connection.url, 'mqtt://localhost');
@@ -44,6 +45,39 @@ test('MQTT connection uses configured authentication and subscribes on connect',
     assert.equal(client.subscriptions[0][0], 'zigbee2mqtt/#');
     assert.deepEqual(client.subscriptions[0][1], { qos: 1 });
     assert.equal(typeof client.subscriptions[0][2], 'function');
+});
+
+test('MQTT connection falls back to a plain-text login from older flows', () => {
+    const { connection, logs } = createServer({
+        mqtt_username: 'user',
+        mqtt_password: 'pass'
+    });
+
+    assert.equal(connection.options.username, 'user');
+    assert.equal(connection.options.password, 'pass');
+    assert.equal(logs.filter((entry) => entry.level === 'warn').length, 1);
+});
+
+test('MQTT connection prefers a plain-text login over credentials', () => {
+    const { connection, logs } = createServer({
+        mqtt_username: 'user',
+        mqtt_password: 'pass'
+    }, {
+        user: 'stored-user',
+        password: 'stored-pass'
+    });
+
+    assert.equal(connection.options.username, 'user');
+    assert.equal(connection.options.password, 'pass');
+    assert.equal(logs.filter((entry) => entry.level === 'warn').length, 1);
+});
+
+test('MQTT connection without a login sends none and does not warn', () => {
+    const { connection, logs } = createServer();
+
+    assert.equal(connection.options.username, null);
+    assert.equal(connection.options.password, null);
+    assert.equal(logs.filter((entry) => entry.level === 'warn').length, 0);
 });
 
 test('topic and availability helpers use the configured base topic', () => {

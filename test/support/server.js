@@ -47,8 +47,8 @@ if (originalMqttModule) {
 
 const { createRuntime } = require('./runtime');
 
-function createServer(config = {}) {
-    const runtime = createRuntime();
+function createServer(config = {}, credentials = {}) {
+    const runtime = createRuntime({ credentials: { 'server-id': credentials } });
     registerServer(runtime.RED);
     const ServerNode = runtime.types.get('zigbee2mqtt-server');
     const node = new ServerNode({

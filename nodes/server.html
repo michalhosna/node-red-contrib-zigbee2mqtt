@@ -28,12 +28,12 @@
         <input type="text" id="node-config-input-mqtt_port" placeholder="1883">
     </div>
     <div class="form-row">
-        <label for="node-config-input-mqtt_username" class="l-width"><i class="fa fa-user"></i> <span data-i18n="label.mqtt_username"></span></label>
-        <input type="text" id="node-config-input-mqtt_username" autocomplete="new-password">
+        <label for="node-config-input-user" class="l-width"><i class="fa fa-user"></i> <span data-i18n="label.mqtt_username"></span></label>
+        <input type="text" id="node-config-input-user" autocomplete="new-password">
     </div>
     <div class="form-row">
-        <label for="node-config-input-mqtt_password" class="l-width"><i class="fa fa-lock"></i> <span data-i18n="label.mqtt_password"></span></label>
-        <input type="password" id="node-config-input-mqtt_password" autocomplete="new-password">
+        <label for="node-config-input-password" class="l-width"><i class="fa fa-lock"></i> <span data-i18n="label.mqtt_password"></span></label>
+        <input type="password" id="node-config-input-password" autocomplete="new-password">
     </div>
     <div class="form-row">
         <label for="node-config-input-mqtt_qos" class="l-width"><i class="fa fa-empire"></i> <span data-i18n="node-red:mqtt.label.qos">QoS</span></label>
@@ -64,6 +64,52 @@
 </script>
 
 <script type='text/javascript'>
+    // Older flows keep the MQTT login in the plain mqtt_username/mqtt_password
+    // properties. Move it to credentials when a flow is loaded or imported.
+    // The next deploy stores it in flows_cred.json.
+    RED.events.on('nodes:add', function (proxy) {
+        if (proxy.type !== 'zigbee2mqtt-server' || !(proxy.mqtt_username || proxy.mqtt_password)) {
+            return;
+        }
+        // Locked flows reject writes through the node proxy. The lock guards
+        // user edits, not this format upgrade. Write to the node behind it.
+        const flow = proxy.z && (RED.nodes.workspace(proxy.z) || RED.nodes.subflow(proxy.z));
+        const node = (flow && flow.locked && proxy.__node__) || proxy;
+        const partial = !(node.mqtt_username && node.mqtt_password);
+        // `_` holds the values loaded from the runtime. Node-RED before 2.1
+        // expects it whenever `credentials` is set.
+        node.credentials = node.credentials || {_: {}};
+        if (node.mqtt_username) {
+            node.credentials.user = node.mqtt_username;
+        }
+        if (node.mqtt_password) {
+            node.credentials.password = node.mqtt_password;
+            node.credentials.has_password = true;
+        }
+        node.mqtt_username = '';
+        node.mqtt_password = '';
+        node.changed = true;
+        // The other half may already be stored. Without it the edit dialog
+        // shows that field empty and clears it on save.
+        if (partial) {
+            $.getJSON('credentials/zigbee2mqtt-server/' + node.id, function (stored) {
+                if (!node.credentials) {
+                    return;
+                }
+                if (!node.credentials.user && stored.user) {
+                    node.credentials.user = stored.user;
+                }
+                if (!node.credentials.has_password && stored.has_password) {
+                    node.credentials.has_password = true;
+                }
+            });
+        }
+        // Loading flows clears the dirty flag right after adding the nodes.
+        setTimeout(function () {
+            RED.nodes.dirty(true);
+        });
+    });
+
     RED.nodes.registerType('zigbee2mqtt-server', {
         category: 'config',
         defaults: {
@@ -111,6 +157,10 @@
                 value: 'homeassistant',
                 required: false
             },
+        },
+        credentials: {
+            user: {type: "text"},
+            password: {type: "password"}
         },
         label: function() {
             return this.name || this.host;

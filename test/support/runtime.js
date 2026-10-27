@@ -1,6 +1,6 @@
 const EventEmitter = require('node:events');
 
-function createRuntime({ nodes = {}, evaluateNodeProperty } = {}) {
+function createRuntime({ nodes = {}, evaluateNodeProperty, credentials = {} } = {}) {
     const types = new Map();
     const routes = new Map();
     const logs = [];
@@ -18,6 +18,7 @@ function createRuntime({ nodes = {}, evaluateNodeProperty } = {}) {
                 }
 
                 node.id = config.id || `test-node-${++nodeId}`;
+                node.credentials = { ...credentials[node.id] };
                 node.messages = [];
                 node.statuses = [];
                 node.status = (status) => {
